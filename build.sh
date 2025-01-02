@@ -6,12 +6,15 @@ if [ ! -d "./out" ]; then
     mkdir "./out"
 fi
 
-outfile="main"
+outfile="serialization_test"
 rmfile="${main}*"
 if ls ./out/${rmfile} 1> /dev/null 2>&1; then
     rm ./out/${rmfile}
 fi
-#g++ -c ./log/log.cpp -o ./out/log.o -O2 -std=c++17
-#g++ -c ./main.cpp -o ./out/main.o -O2 -std=c++17 -Wno-builtin-declaration-mismatch
-g++ -static ./main.cpp -o ./out/${outfile}_${version}.exe -std=c++17
 
+g++ -c ./src/json.cpp -o ./out/src_json.o -O2 -std=c++17
+g++ -c ./main.cpp -o ./out/main.o -O2 -std=c++17
+g++ -static ./out/src_json.o ./out/main.o  -o ./out/${outfile}_${version}.exe -std=c++17
+
+rm ./out/src_json.o
+rm ./out/main.o

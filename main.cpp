@@ -42,47 +42,18 @@ public:
     BBB b;
 };
 
-string answer0, answer1;
-
-void task0()
-{
-    AAA a;
-    to_serialize ser;
-
-    for (int i = 0; i < 10; ++i) {
-        a.x = i;
-        a.y = 10 - i;
-        a.f = true;
-        a.aaa = "task0";
-        answer0 = ser(a);
-        sleep(1);
-    }
-}
-
-void task1()
-{
-    AAA a;
-    to_serialize ser;
-
-    for (int i = 0; i < 10; ++i) {
-        a.x = i + 100;
-        a.y = 10 - i + 100;
-        a.f = false;
-        a.aaa = "task1";
-        answer1 = ser(a);
-        sleep(1);
-    }
-}
-
 int main()
 {
-    thread t1(task0), t2(task1);
+    json_object* json_root = json_load("C:/Users/yunjie.li/Documents/code/c_json_serialization/result.json");
+    cout << "load finish\n";
+    if (json_root != nullptr) {
+        cout << "json_type : " << json_root->type << endl;
 
-    t1.join();
-    t2.join();
+        to_serialize ser;
 
-    cout << answer0 << endl
-         << answer1 << endl;
+        cout << ser(json_root) << endl;
 
+        delete json_root;
+    }
     return 0;
 }

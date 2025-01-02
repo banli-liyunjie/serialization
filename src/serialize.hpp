@@ -1,11 +1,7 @@
+#include "json.hpp"
 #include <array>
-#include <iostream>
 #include <mutex>
-#include <sstream>
-#include <string>
 #include <type_traits>
-#include <unordered_map>
-#include <vector>
 
 struct to_serialize;
 
@@ -39,13 +35,56 @@ private:
 };
 
 struct to_serialize {
-    // template <typename _T>
-    // typename std::enable_if<!std::is_base_of<serialize<_T>, _T>::value, std::string>::type
-    // operator()(const _T& t)
-    //{
-    //     return "{\"error\": \"unsupported type\"}";
-    // }
     inline static std::recursive_mutex serialize_mutex;
+
+    inline std::string operator()(const json_object* jo)
+    {
+        std::ostringstream oss;
+        if (jo->type == json_type::JSON_WRONG) {
+            return "{wrong json object}";
+        }
+        switch (jo->type) {
+        case json_type::JSON_NULL:
+            return "null";
+        case json_type::JSON_BOOL:
+            return std::get<bool>(jo->value) ? "true" : "false";
+        case json_type::JSON_STRING:
+            return "\"" + std::get<std::string>(jo->value) + "\"";
+        case json_type::JSON_INTEGER:
+            oss << std::get<long long>(jo->value);
+            break;
+        case json_type::JSON_FLOATING:
+            oss << std::get<double>(jo->value);
+            break;
+        case json_type::JSON_ARRAY: {
+            oss << "[";
+            auto& v = std::get<std::vector<json_object*>>(jo->value);
+            for (int i = 0; i < v.size(); ++i) {
+                oss << (*this)(v[i]);
+                if (i < v.size() - 1)
+                    oss << ", ";
+            }
+            oss << "]";
+            break;
+        }
+        case json_type::JSON_CLASS: {
+            oss << "{";
+            auto& u = std::get<std::unordered_map<std::string, json_object*>>(jo->value);
+            for (auto it = u.begin(); it != u.end(); ++it) {
+                oss << "\"" << it->first << "\" : ";
+                oss << (*this)(it->second);
+                if (std::next(it) != u.end())
+                    oss << ", ";
+            }
+            oss << "}";
+            break;
+        }
+        default:
+            return "wrong json type";
+        }
+
+        return oss.str();
+    }
 
     template <typename _T>
     typename std::enable_if<std::is_arithmetic<_T>::value, std::string>::type
