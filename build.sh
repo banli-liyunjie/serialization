@@ -7,7 +7,7 @@ if [ ! -d "./out" ]; then
 fi
 
 outfile="serialization_test"
-rmfile="${main}*"
+rmfile="${outfile}*"
 if ls ./out/${rmfile} 1> /dev/null 2>&1; then
     rm ./out/${rmfile}
 fi

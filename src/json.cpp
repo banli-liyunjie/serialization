@@ -98,7 +98,7 @@ size_t analyze_json_string(json_object* jo, string& json_string, size_t pos)
                     cerr << "duplicate key : " << "\"" << key << "\"" << endl;
                     goto CLASS_WRONG;
                 }
-                loc = json_string.find_first_not_of('"', next + 1);
+                loc = json_string.find_first_not_of(non_string, next + 1);
                 if (loc == string::npos || json_string[loc] != ':') {
                     cerr << "the key " << "(\"" << key << "\")" << " must be followed by the character ':'" << endl;
                     goto CLASS_WRONG;
