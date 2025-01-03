@@ -34,3 +34,5 @@ private:
 };
 
 json_object* json_load(const std::string& file_name);
+
+json_object* json_get(const std::string& json_string);

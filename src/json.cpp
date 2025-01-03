@@ -69,7 +69,7 @@ json_object* json_object::operator[](const string& key) const
         return nullptr;
 }
 
-size_t analyze_json_string(json_object* jo, string& json_string, size_t pos)
+size_t analyze_json_string(json_object* jo, const string& json_string, size_t pos)
 {
     string non_string = " \n\t\r";
 
@@ -333,6 +333,11 @@ json_object* json_load(const string& file_name)
         std::istreambuf_iterator<char>());
     input_file.close();
 
+    return json_get(json_string);
+}
+
+json_object* json_get(const string& json_string)
+{
     json_object* jo = new json_object();
 
     analyze_json_string(jo, json_string, 0);
