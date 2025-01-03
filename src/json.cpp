@@ -17,7 +17,7 @@ json_object::~json_object()
     }
 }
 
-string json_object::get_json_string()
+string json_object::get_json_string() const
 {
     if (type == json_type::JSON_STRING)
         return get<string>(value);
@@ -25,7 +25,7 @@ string json_object::get_json_string()
         return "";
 }
 
-long long json_object::get_json_integer()
+long long json_object::get_json_integer() const
 {
     if (type == json_type::JSON_INTEGER)
         return get<long long>(value);
@@ -33,7 +33,7 @@ long long json_object::get_json_integer()
         return 0;
 }
 
-double json_object::get_json_floating()
+double json_object::get_json_floating() const
 {
     if (type == json_type::JSON_FLOATING)
         return get<double>(value);
@@ -41,7 +41,15 @@ double json_object::get_json_floating()
         return 0.0f;
 }
 
-json_object* json_object::operator[](size_t index)
+bool json_object::get_json_boolean() const
+{
+    if (type == json_type::JSON_BOOL)
+        return get<bool>(value);
+    else
+        return false;
+}
+
+json_object* json_object::operator[](size_t index) const
 {
     if (type == json_type::JSON_ARRAY && index < get<vector<json_object*>>(value).size())
         return get<vector<json_object*>>(value)[index];
@@ -49,12 +57,12 @@ json_object* json_object::operator[](size_t index)
         return nullptr;
 }
 
-json_object* json_object::operator[](const string& key)
+json_object* json_object::operator[](const string& key) const
 {
-    if (type == json_type::JSON_ARRAY) {
+    if (type == json_type::JSON_CLASS) {
         auto& u = get<unordered_map<std::string, json_object*>>(value);
         if (u.find(key) != u.end())
-            return u[key];
+            return u.at(key);
         else
             return nullptr;
     } else

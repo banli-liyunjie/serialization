@@ -15,34 +15,57 @@ namespace fs = filesystem;
 class BBB : public serialize<BBB> {
 public:
     using serialize<BBB>::json_update;
+    using serialize<BBB>::data_update;
     void json_update() const
     {
-        json_update(string("x"), this, &this->x);
-        json_update(string("y"), this, &this->y);
-        json_update(string("bbb"), this, &this->bbb);
-        json_update(string("array"), this, &this->array);
+        json_update(string("x"), this->x);
+        json_update(string("y"), this->y);
+        json_update(string("bbb"), this->bbb);
+        json_update(string("array"), this->array);
+    }
+    int data_update(const json_object* jo)
+    {
+        auto& object = *jo;
+        int ret = 0;
+        ret |= data_update(this->x, object["x"]);
+        ret |= data_update(this->y, object["y"]);
+        ret |= data_update(this->bbb, object["bbb"]);
+        ret |= data_update(this->array, object["array"]);
+        return ret;
     }
 
 private:
     int x = 12;
     float y = 25.6;
     string bbb = "bbb";
-    vector<int> array = { 3, 6, 7, 8 };
+    vector<int> array = { 1, 3, 5, 7, 9 };
 };
 
 class AAA : public serialize<AAA> {
 public:
     using serialize<AAA>::json_update;
+    using serialize<AAA>::data_update;
     void json_update() const
     {
-        json_update(string("x"), this, &this->x);
-        json_update(string("y"), this, &this->y);
-        json_update(string("f"), this, &this->f);
-        json_update(string("aaa"), this, &this->aaa);
-        json_update(string("b"), this, &this->b);
+        json_update(string("x"), this->x);
+        json_update(string("y"), this->y);
+        json_update(string("f"), this->f);
+        json_update(string("aaa"), this->aaa);
+        json_update(string("b"), this->b);
+    }
+    int data_update(const json_object* jo)
+    {
+        auto& object = *jo;
+        int ret = 0;
+        ret |= data_update(this->x, object["x"]);
+        ret |= data_update(this->y, object["y"]);
+        ret |= data_update(this->f, object["f"]);
+        ret |= data_update(this->aaa, object["aaa"]);
+        ret |= data_update(this->b, object["b"]);
+        return ret;
     }
 
-    // private:
+private:
     int x = -20;
     float y = 3.141592;
     bool f = true;
@@ -93,6 +116,7 @@ int main()
 
     AAA a;
     to_serialize ser;
+    to_deserialize deser;
 
     string content = ser(a);
 
@@ -101,16 +125,17 @@ int main()
 #else
     string command = "echo \"" + content + "\" > " + result_json;
 #endif
+
     system(command.c_str());
 
     json_object* json_root = json_load(result_json);
 
     if (json_root != nullptr) {
         cout << "json_type : " << json_root->type << endl;
-
-        to_serialize ser;
-
         cout << ser(json_root) << endl;
+
+        deser(a, json_root);
+        cout << ser(a) << endl;
 
         delete json_root;
     }

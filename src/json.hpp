@@ -23,11 +23,12 @@ public:
     json_object() = default;
     ~json_object();
 
-    std::string get_json_string();
-    long long get_json_integer();
-    double get_json_floating();
-    json_object* operator[](size_t index);
-    json_object* operator[](const std::string& key);
+    std::string get_json_string() const;
+    long long get_json_integer() const;
+    double get_json_floating() const;
+    bool get_json_boolean() const;
+    json_object* operator[](size_t index) const;
+    json_object* operator[](const std::string& key) const;
 
 private:
 };

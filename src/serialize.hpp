@@ -4,6 +4,7 @@
 #include <type_traits>
 
 struct to_serialize;
+struct to_deserialize;
 
 template <typename _T>
 class serialize {
@@ -13,24 +14,31 @@ public:
     virtual ~serialize() {};
 
     virtual void json_update() const = 0;
+    virtual int data_update(const json_object* jo) = 0;
 
     friend to_serialize;
+    friend to_deserialize;
 
 protected:
     template <typename _SUB_T>
-    void json_update(const std::string& name, const _T* t, const _SUB_T* sub_t) const
+    void json_update(const std::string& name, const _SUB_T& sub_t) const
     {
-        if (offset.find(name) == offset.end()) {
-            offset.emplace(name, (size_t)sub_t - (size_t)t);
+        to_serialize ser;
+        sub_jsons[name] = ser(sub_t);
+    }
+    template <typename _SUB_T>
+    int data_update(_SUB_T& sub_t, const json_object* jo)
+    {
+        if (jo == nullptr) {
+            std::cerr << typeid(_SUB_T).name() << " please check json_object or this class update func" << std::endl;
+            return -1;
         }
 
-        to_serialize ser;
-
-        sub_jsons[name] = ser(*sub_t);
+        to_deserialize deser;
+        return deser(sub_t, jo);
     }
 
 private:
-    inline static std::unordered_map<std::string, size_t> offset;
     inline static std::unordered_map<std::string, std::string> sub_jsons;
 };
 
@@ -119,20 +127,6 @@ struct to_serialize {
         return json_string;
     }
 
-    template <typename T, size_t N>
-    std::string operator()(const std::array<T, N>& arr)
-    {
-        std::string json_string = "[";
-        for (size_t i = 0; i < N; ++i) {
-            json_string += (*this)(arr[i]);
-            if (i < N - 1) {
-                json_string += ", ";
-            }
-        }
-        json_string += "]";
-        return json_string;
-    }
-
     template <typename _T>
     typename std::enable_if<std::is_base_of<serialize<_T>, _T>::value, std::string>::type
     operator()(const _T& obj)
@@ -150,5 +144,82 @@ struct to_serialize {
         }
         oss << "}";
         return oss.str();
+    }
+};
+
+struct to_deserialize {
+
+    template <typename _T>
+    typename std::enable_if<std::is_arithmetic<_T>::value, int>::type
+    operator()(_T& t, const json_object* jo) // no type check
+    {
+        if (jo == nullptr) {
+            std::cerr << "please check json_object" << std::endl;
+            return -1;
+        }
+        if (jo->type == json_type::JSON_INTEGER) {
+            t = (_T)(jo->get_json_integer());
+        } else if (jo->type == json_type::JSON_FLOATING) {
+            t = (_T)(jo->get_json_floating());
+        } else {
+            std::cerr << "please check json_object" << std::endl;
+            return -1;
+        }
+        return 0;
+    }
+
+    int operator()(bool& b, const json_object* jo)
+    {
+        if (jo == nullptr || jo->type != json_type::JSON_BOOL) {
+            std::cerr << "please check json_object" << std::endl;
+            return -1;
+        }
+        b = jo->get_json_boolean();
+        return 0;
+    }
+
+    int operator()(std::string& s, const json_object* jo)
+    {
+        if (jo == nullptr || jo->type != json_type::JSON_STRING) {
+            std::cerr << "please check json_object" << std::endl;
+            return -1;
+        }
+        s = jo->get_json_string();
+        return 0;
+    }
+
+    template <typename T>
+    int operator()(std::vector<T>& vec, const json_object* jo)
+    {
+        if (jo == nullptr || jo->type != json_type::JSON_ARRAY) {
+            std::cerr << "please check json_object" << std::endl;
+            return -1;
+        }
+        auto& sub_jo = std::get<std::vector<json_object*>>(jo->value);
+        if (vec.size() > sub_jo.size())
+            vec.resize(sub_jo.size());
+        else if (vec.size() < sub_jo.size()) {
+            T t;
+            size_t c;
+            vec.resize(sub_jo.size());
+            std::fill(vec.begin() + c, vec.end(), t);
+        }
+
+        for (size_t i = 0; i < sub_jo.size(); ++i) {
+            if ((*this)(vec[i], sub_jo[i]) != 0)
+                return -1;
+        }
+        return 0;
+    }
+
+    template <typename _T>
+    typename std::enable_if<std::is_base_of<serialize<_T>, _T>::value, int>::type
+    operator()(_T& obj, const json_object* jo)
+    {
+        if (jo == nullptr || jo->type != json_type::JSON_CLASS) {
+            std::cerr << "please check json_object" << std::endl;
+            return -1;
+        }
+        return obj.data_update(jo);
     }
 };
