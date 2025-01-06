@@ -16,7 +16,7 @@ class BBB : public serialize<BBB> {
 public:
     using serialize<BBB>::json_update;
     using serialize<BBB>::data_update;
-    void json_update() const
+    void json_update()
     {
         json_update(string("x"), this->x);
         json_update(string("y"), this->y);
@@ -45,7 +45,7 @@ class AAA : public serialize<AAA> {
 public:
     using serialize<AAA>::json_update;
     using serialize<AAA>::data_update;
-    void json_update() const
+    void json_update()
     {
         json_update(string("x"), this->x);
         json_update(string("y"), this->y);
@@ -136,6 +136,9 @@ int main()
 
         deser(a, json_root);
         cout << ser(a) << endl;
+
+        cout << ser(5) << endl;
+        // cout << ser(vector<int>(1, 3, 4, 5)) << endl;
 
         delete json_root;
     }

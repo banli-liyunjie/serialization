@@ -13,7 +13,7 @@ public:
     serialize(const serialize& s) = default;
     virtual ~serialize() {};
 
-    virtual void json_update() const = 0;
+    virtual void json_update() = 0;
     virtual int data_update(const json_object* jo) = 0;
 
     friend to_serialize;
@@ -21,7 +21,7 @@ public:
 
 protected:
     template <typename _SUB_T>
-    void json_update(const std::string& name, const _SUB_T& sub_t) const
+    void json_update(const std::string& name, _SUB_T& sub_t)
     {
         to_serialize ser;
         sub_jsons[name] = ser(sub_t);
@@ -129,7 +129,7 @@ struct to_serialize {
 
     template <typename _T>
     typename std::enable_if<std::is_base_of<serialize<_T>, _T>::value, std::string>::type
-    operator()(const _T& obj)
+    operator()(_T& obj)
     {
         std::lock_guard<std::recursive_mutex> lock(serialize_mutex);
 
