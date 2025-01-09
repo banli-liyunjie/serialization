@@ -1,66 +1,67 @@
-#include "json.hpp"
+#pragma once
+
 #include <filesystem>
 #include <fstream>
 
-using namespace std;
+namespace banli {
 
 json_object::~json_object()
 {
     if (type == json_type::JSON_ARRAY) {
-        for (auto p : get<vector<json_object*>>(value)) {
+        for (auto p : std::get<std::vector<json_object*>>(value)) {
             delete (p);
         }
     } else if (type == json_type::JSON_CLASS) {
-        for (auto p : get<unordered_map<std::string, json_object*>>(value)) {
+        for (auto p : std::get<std::unordered_map<std::string, json_object*>>(value)) {
             delete (p.second);
         }
     }
 }
 
-string json_object::get_json_string() const
+inline std::string json_object::get_json_string() const
 {
     if (type == json_type::JSON_STRING)
-        return get<string>(value);
+        return std::get<std::string>(value);
     else
         return "";
 }
 
-long long json_object::get_json_integer() const
+inline long long json_object::get_json_integer() const
 {
     if (type == json_type::JSON_INTEGER)
-        return get<long long>(value);
+        return std::get<long long>(value);
     else
         return 0;
 }
 
-double json_object::get_json_floating() const
+inline double json_object::get_json_floating() const
 {
     if (type == json_type::JSON_FLOATING)
-        return get<double>(value);
+        return std::get<double>(value);
     else
         return 0.0f;
 }
 
-bool json_object::get_json_boolean() const
+inline bool json_object::get_json_boolean() const
 {
     if (type == json_type::JSON_BOOL)
-        return get<bool>(value);
+        return std::get<bool>(value);
     else
         return false;
 }
 
-json_object* json_object::operator[](size_t index) const
+inline json_object* json_object::operator[](size_t index) const
 {
-    if (type == json_type::JSON_ARRAY && index < get<vector<json_object*>>(value).size())
-        return get<vector<json_object*>>(value)[index];
+    if (type == json_type::JSON_ARRAY && index < std::get<std::vector<json_object*>>(value).size())
+        return std::get<std::vector<json_object*>>(value)[index];
     else
         return nullptr;
 }
 
-json_object* json_object::operator[](const string& key) const
+inline json_object* json_object::operator[](const std::string& key) const
 {
     if (type == json_type::JSON_CLASS) {
-        auto& u = get<unordered_map<std::string, json_object*>>(value);
+        auto& u = std::get<std::unordered_map<std::string, json_object*>>(value);
         if (u.find(key) != u.end())
             return u.at(key);
         else
@@ -69,64 +70,64 @@ json_object* json_object::operator[](const string& key) const
         return nullptr;
 }
 
-size_t analyze_json_string(json_object* jo, const string& json_string, size_t pos)
+inline size_t analyze_json_string(json_object* jo, const std::string& json_string, size_t pos)
 {
-    string non_string = " \n\t\r";
+    std::string non_string = " \n\t\r";
 
     size_t loc = json_string.find_first_not_of(non_string, pos);
 
-    if (loc != string::npos) {
+    if (loc != std::string::npos) {
         switch (json_string[loc]) {
         case '{': {
-            jo->value = unordered_map<std::string, json_object*>();
+            jo->value = std::unordered_map<std::string, json_object*>();
             size_t times = 0;
             while (({
                 loc = json_string.find_first_not_of(non_string, loc + 1);
-                loc != string::npos && (json_string[loc] == '"' || (json_string[loc] == ',' && times > 0));
+                loc != std::string::npos && (json_string[loc] == '"' || (json_string[loc] == ',' && times > 0));
             })) {
                 if (json_string[loc] == ',') {
                     loc = json_string.find_first_not_of(non_string, loc + 1);
                     if (json_string[loc] != '"') {
-                        cerr << "fields in the object do not start with the character '\"'" << endl;
+                        std::cerr << "fields in the object do not start with the character '\"'" << std::endl;
                         goto CLASS_WRONG;
                     }
                 }
                 size_t next;
                 while (({
                     next = json_string.find_first_of('"', loc + 1);
-                    next != string::npos && (json_string[next - 1] == '\\');
+                    next != std::string::npos && (json_string[next - 1] == '\\');
                 })) { }
-                if (next == string::npos) {
-                    cerr << "missing character '\"'" << endl;
+                if (next == std::string::npos) {
+                    std::cerr << "missing character '\"'" << std::endl;
                     goto CLASS_WRONG;
                 }
-                string key = json_string.substr(loc + 1, next - loc - 1);
-                auto& u = get<unordered_map<std::string, json_object*>>(jo->value);
+                std::string key = json_string.substr(loc + 1, next - loc - 1);
+                auto& u = std::get<std::unordered_map<std::string, json_object*>>(jo->value);
                 if (u.find(key) != u.end()) {
-                    cerr << "duplicate key : " << "\"" << key << "\"" << endl;
+                    std::cerr << "duplicate key : " << "\"" << key << "\"" << std::endl;
                     goto CLASS_WRONG;
                 }
                 loc = json_string.find_first_not_of(non_string, next + 1);
-                if (loc == string::npos || json_string[loc] != ':') {
-                    cerr << "the key " << "(\"" << key << "\")" << " must be followed by the character ':'" << endl;
+                if (loc == std::string::npos || json_string[loc] != ':') {
+                    std::cerr << "the key " << "(\"" << key << "\")" << " must be followed by the character ':'" << std::endl;
                     goto CLASS_WRONG;
                 }
                 json_object* sub_object = new json_object();
                 loc = analyze_json_string(sub_object, json_string, loc + 1);
                 if (sub_object->type == json_type::JSON_WRONG) {
                     delete sub_object;
-                    cerr << "the key " << "(\"" << key << "\")" << " does not have a valid object" << endl;
+                    std::cerr << "the key " << "(\"" << key << "\")" << " does not have a valid object" << std::endl;
                     goto CLASS_WRONG;
                 }
                 u.emplace(key, sub_object);
                 times++;
             }
-            if (loc == string::npos || json_string[loc] != '}') {
-                cerr << "missing character '}' or starts with the character ','" << endl;
+            if (loc == std::string::npos || json_string[loc] != '}') {
+                std::cerr << "missing character '}' or starts with the character ','" << std::endl;
                 goto CLASS_WRONG;
             }
-            if (pos == 0 && json_string.find_first_not_of(non_string, loc + 1) != string::npos) {
-                cerr << "extra characters at the end" << endl;
+            if (pos == 0 && json_string.find_first_not_of(non_string, loc + 1) != std::string::npos) {
+                std::cerr << "extra characters at the end" << std::endl;
                 goto CLASS_WRONG;
             }
 
@@ -135,7 +136,7 @@ size_t analyze_json_string(json_object* jo, const string& json_string, size_t po
             break;
 
         CLASS_WRONG:
-            for (auto p : get<unordered_map<string, json_object*>>(jo->value)) {
+            for (auto p : std::get<std::unordered_map<std::string, json_object*>>(jo->value)) {
                 delete (p.second);
             }
             jo->type = json_type::JSON_WRONG;
@@ -143,16 +144,16 @@ size_t analyze_json_string(json_object* jo, const string& json_string, size_t po
         }
 
         case '[': {
-            jo->value = vector<json_object*>();
+            jo->value = std::vector<json_object*>();
             size_t times = 0;
             while (({
                 loc = json_string.find_first_not_of(non_string, loc + 1);
-                loc != string::npos&& json_string[loc] != ']' && (!(json_string[loc] == ',' && times == 0));
+                loc != std::string::npos&& json_string[loc] != ']' && (!(json_string[loc] == ',' && times == 0));
             })) {
                 if (json_string[loc] == ',') {
                     loc = json_string.find_first_not_of(non_string, loc + 1);
-                    if (loc == string::npos) {
-                        cerr << "unexpected end" << endl;
+                    if (loc == std::string::npos) {
+                        std::cerr << "unexpected end" << std::endl;
                         goto ARRAY_WRONG;
                     }
                 }
@@ -160,18 +161,18 @@ size_t analyze_json_string(json_object* jo, const string& json_string, size_t po
                 loc = analyze_json_string(sub_object, json_string, loc);
                 if (sub_object->type == json_type::JSON_WRONG) {
                     delete sub_object;
-                    cerr << "the array does not have a valid object" << endl;
+                    std::cerr << "the array does not have a valid object" << std::endl;
                     goto ARRAY_WRONG;
                 }
-                get<vector<json_object*>>(jo->value).emplace_back(sub_object);
+                std::get<std::vector<json_object*>>(jo->value).emplace_back(sub_object);
                 times++;
             }
-            if (loc == string::npos || loc == ',') {
-                cerr << "missing character ']' or starts with the character ','" << endl;
+            if (loc == std::string::npos || loc == ',') {
+                std::cerr << "missing character ']' or starts with the character ','" << std::endl;
                 goto ARRAY_WRONG;
             }
-            if (pos == 0 && json_string.find_first_not_of(non_string, loc + 1) != string::npos) {
-                cerr << "extra characters at the end" << endl;
+            if (pos == 0 && json_string.find_first_not_of(non_string, loc + 1) != std::string::npos) {
+                std::cerr << "extra characters at the end" << std::endl;
                 goto ARRAY_WRONG;
             }
 
@@ -180,7 +181,7 @@ size_t analyze_json_string(json_object* jo, const string& json_string, size_t po
             break;
 
         ARRAY_WRONG:
-            auto& v = get<vector<json_object*>>(jo->value);
+            auto& v = std::get<std::vector<json_object*>>(jo->value);
             for (auto& p : v) {
                 delete p;
             }
@@ -194,15 +195,15 @@ size_t analyze_json_string(json_object* jo, const string& json_string, size_t po
             size_t next;
             while (({
                 next = json_string.find_first_of('"', loc + 1);
-                next != string::npos && (json_string[next - 1] == '\\');
+                next != std::string::npos && (json_string[next - 1] == '\\');
             })) { }
-            if (next == string::npos) {
-                cerr << "missing character '\"'" << endl;
-            } else if (pos == 0 && json_string.find_first_not_of(non_string, next + 1) != string::npos) {
-                cerr << "extra characters at the end" << endl;
+            if (next == std::string::npos) {
+                std::cerr << "missing character '\"'" << std::endl;
+            } else if (pos == 0 && json_string.find_first_not_of(non_string, next + 1) != std::string::npos) {
+                std::cerr << "extra characters at the end" << std::endl;
             } else {
                 jo->type = json_type::JSON_STRING;
-                get<string>(jo->value) = json_string.substr(loc + 1, next - loc - 1);
+                std::get<std::string>(jo->value) = json_string.substr(loc + 1, next - loc - 1);
                 pos = next;
             }
             break;
@@ -210,8 +211,8 @@ size_t analyze_json_string(json_object* jo, const string& json_string, size_t po
         default: {
             if (json_string[loc] == 't' && loc + 3 < json_string.size()) {
                 if (json_string.substr(loc, 4) == "true") {
-                    if (pos == 0 && json_string.find_first_not_of(non_string, loc + 3 + 1) != string::npos) {
-                        cerr << "extra characters at the end" << endl;
+                    if (pos == 0 && json_string.find_first_not_of(non_string, loc + 3 + 1) != std::string::npos) {
+                        std::cerr << "extra characters at the end" << std::endl;
                         goto WRONG;
                     }
 
@@ -222,8 +223,8 @@ size_t analyze_json_string(json_object* jo, const string& json_string, size_t po
                     goto WRONG;
                 }
             } else if (json_string[loc] == 'f' && loc + 4 < json_string.size()) {
-                if (pos == 0 && json_string.find_first_not_of(non_string, loc + 4 + 1) != string::npos) {
-                    cerr << "extra characters at the end" << endl;
+                if (pos == 0 && json_string.find_first_not_of(non_string, loc + 4 + 1) != std::string::npos) {
+                    std::cerr << "extra characters at the end" << std::endl;
                     goto WRONG;
                 }
 
@@ -236,8 +237,8 @@ size_t analyze_json_string(json_object* jo, const string& json_string, size_t po
                 }
 
             } else if (json_string[loc] == 'n' && loc + 3 < json_string.size()) {
-                if (pos == 0 && json_string.find_first_not_of(non_string, loc + 3 + 1) != string::npos) {
-                    cerr << "extra characters at the end" << endl;
+                if (pos == 0 && json_string.find_first_not_of(non_string, loc + 3 + 1) != std::string::npos) {
+                    std::cerr << "extra characters at the end" << std::endl;
                     goto WRONG;
                 }
 
@@ -248,8 +249,8 @@ size_t analyze_json_string(json_object* jo, const string& json_string, size_t po
                     goto WRONG;
                 }
             } else {
-                if (json_string[loc] != '-' && !isdigit(json_string[loc])) {
-                    cerr << "invalid json number or string"<<endl;
+                if (json_string[loc] != '-' && !std::isdigit(json_string[loc])) {
+                    std::cerr << "invalid json number or string" << std::endl;
                     goto WRONG;
                 }
                 bool is_floating_point = false;
@@ -261,7 +262,7 @@ size_t analyze_json_string(json_object* jo, const string& json_string, size_t po
                     end++;
 
                 for (; end < json_string.size(); end++) {
-                    if (isdigit(json_string[end])) {
+                    if (std::isdigit(json_string[end])) {
                         has_digits = true;
                     } else if (json_string[end] == '.' && has_digits && !is_floating_point) {
                         point_loc = end;
@@ -271,7 +272,7 @@ size_t analyze_json_string(json_object* jo, const string& json_string, size_t po
                     }
                 }
                 if (!has_digits || (is_floating_point && point_loc == end - 1) || (end < json_string.size() && json_string[loc] == '.')) {
-                    cerr << "invalid json number or string" << endl;
+                    std::cerr << "invalid json number or string" << std::endl;
                     goto WRONG;
                 }
 
@@ -285,21 +286,21 @@ size_t analyze_json_string(json_object* jo, const string& json_string, size_t po
                     }
                 }
                 if (count0 > 1 || (count0 == 1 && int_end > int_start)) {
-                    cerr << "invalid json number or string";
+                    std::cerr << "invalid json number or string" << std::endl;
                     goto WRONG;
                 }
-                if (pos == 0 && json_string.find_first_not_of(non_string, end + 1) != string::npos) {
-                    cerr << "extra characters at the end" << endl;
+                if (pos == 0 && json_string.find_first_not_of(non_string, end + 1) != std::string::npos) {
+                    std::cerr << "extra characters at the end" << std::endl;
                     goto WRONG;
                 }
 
-                string num_str = json_string.substr(loc, end - loc + 1);
+                std::string num_str = json_string.substr(loc, end - loc + 1);
                 pos = end;
                 if (is_floating_point) {
-                    jo->value = stod(num_str);
+                    jo->value = std::stod(num_str);
                     jo->type = json_type::JSON_FLOATING;
                 } else {
-                    jo->value = stoll(num_str);
+                    jo->value = std::stoll(num_str);
                     jo->type = json_type::JSON_INTEGER;
                 }
             }
@@ -316,17 +317,17 @@ size_t analyze_json_string(json_object* jo, const string& json_string, size_t po
     return pos;
 }
 
-json_object* json_load(const string& file_name)
+inline json_object* json_load(const std::string& file_name)
 {
-    if (!filesystem::exists(file_name)) {
-        cerr << "file does not exist : " << file_name << endl;
+    if (!std::filesystem::exists(file_name)) {
+        std::cerr << "file does not exist : " << file_name << std::endl;
         return nullptr;
     }
 
-    ifstream input_file(file_name);
+    std::ifstream input_file(file_name);
 
     if (!input_file) {
-        cerr << "error opening file: " << file_name << endl;
+        std::cerr << "error opening file: " << file_name << std::endl;
         return nullptr;
     }
     std::string json_string((std::istreambuf_iterator<char>(input_file)),
@@ -336,7 +337,7 @@ json_object* json_load(const string& file_name)
     return json_get(json_string);
 }
 
-json_object* json_get(const string& json_string)
+json_object* json_get(const std::string& json_string)
 {
     json_object* jo = new json_object();
 
@@ -346,4 +347,6 @@ json_object* json_get(const string& json_string)
         return jo;
     delete (jo);
     return nullptr;
+}
+
 }

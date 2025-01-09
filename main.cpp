@@ -1,3 +1,4 @@
+#include "src/field_ctrl.hpp"
 #include "src/serialize.hpp"
 #include <filesystem>
 #include <thread>
@@ -10,28 +11,19 @@
 #endif
 
 using namespace std;
+using namespace banli;
 namespace fs = filesystem;
 
-class BBB : public serialize<BBB> {
+class BBB {
 public:
-    using serialize<BBB>::json_update;
-    using serialize<BBB>::data_update;
-    void json_update()
+    template <typename func_struct>
+    int data_update(const string& name, func_struct& func)
     {
-        json_update(string("x"), this->x);
-        json_update(string("y"), this->y);
-        json_update(string("bbb"), this->bbb);
-        json_update(string("array"), this->array);
-    }
-    int data_update(const json_object* jo)
-    {
-        auto& object = *jo;
-        int ret = 0;
-        ret |= data_update(this->x, object["x"]);
-        ret |= data_update(this->y, object["y"]);
-        ret |= data_update(this->bbb, object["bbb"]);
-        ret |= data_update(this->array, object["array"]);
-        return ret;
+        return variable_func_call(name, func,
+            field_left("x", x),
+            field_left("y", y),
+            field_left("bbb", bbb),
+            field_left("array", array));
     }
 
 private:
@@ -41,28 +33,17 @@ private:
     vector<int> array = { 1, 3, 5, 7, 9 };
 };
 
-class AAA : public serialize<AAA> {
+class AAA {
 public:
-    using serialize<AAA>::json_update;
-    using serialize<AAA>::data_update;
-    void json_update()
+    template <typename func_struct>
+    int data_update(const string& name, func_struct& func)
     {
-        json_update(string("x"), this->x);
-        json_update(string("y"), this->y);
-        json_update(string("f"), this->f);
-        json_update(string("aaa"), this->aaa);
-        json_update(string("b"), this->b);
-    }
-    int data_update(const json_object* jo)
-    {
-        auto& object = *jo;
-        int ret = 0;
-        ret |= data_update(this->x, object["x"]);
-        ret |= data_update(this->y, object["y"]);
-        ret |= data_update(this->f, object["f"]);
-        ret |= data_update(this->aaa, object["aaa"]);
-        ret |= data_update(this->b, object["b"]);
-        return ret;
+        return variable_func_call(name, func,
+            field_left("x", x),
+            field_left("y", y),
+            field_left("f", f),
+            field_left("aaa", aaa),
+            field_left("b", b));
     }
 
 private:
@@ -114,11 +95,8 @@ int main()
 
     string result_json = directory_path.string() + "/result.json";
 
-    AAA a;
-    to_serialize ser;
-    to_deserialize deser;
-
-    string content = ser(a);
+    AAA a0, a1;
+    string content = serialize(a0);
 
 #if defined(_WIN32) || defined(_WIN64)
     string command = "echo " + content + " > " + result_json;
@@ -127,18 +105,45 @@ int main()
 #endif
 
     system(command.c_str());
-
     json_object* json_root = json_load(result_json);
 
     if (json_root != nullptr) {
         cout << "json_type : " << json_root->type << endl;
-        cout << ser(json_root) << endl;
+        cout << serialize(json_root) << endl;
 
-        deser(a, json_root);
-        cout << ser(a) << endl;
+        deserialize(a0, json_root);
+        cout << serialize(a0) << endl;
 
-        cout << ser(5) << endl;
-        // cout << ser(vector<int>(1, 3, 4, 5)) << endl;
+        float floating = 3.6f;
+        int integer = 10;
+        vector<int> array = { 4, 5, 6, 7 };
+        BBB b;
+
+        set_field(a0, 10002, "x");
+        set_field(a0, floating, "y");
+        set_field(a0, false, "f");
+        set_field(a0, "aaaxxx", "aaa");
+        set_field(a0, floating, "b", "x"); // implicit conversion, but with loss of precision
+        set_field(a0, integer, "b", "y"); // implicit conversion
+        set_field(a0, "bbbyyyy", "b", "bbb");
+        set_field(a0, array, "b", "array");
+
+        // set_field(d, 3.8);  //wrong
+        set_field(a0, "sss", "x"); // type match wrong
+        set_field(a0, a1, "b", "x"); // type match wrong
+        set_field(a0, 20, "hhh"); // field name wrong
+        set_field(a0, 20, "b", "xxx"); // field name wrong
+        set_field(a0, 20, "y", "x"); // wrong class type
+        set_field(a0, 20, "b", "x", "z"); // wrong class type
+        set_field(a0, 20, ""); // name empty wrong
+        set_field(a0, 20, "b", ""); // name empty wrong
+
+        string js = serialize(a0);
+        deserialize(a1, js);
+        cout << serialize(a1) << endl;
+
+        set_field(a0, b, "b"); // operator=
+        cout << serialize(a0) << endl;
 
         delete json_root;
     }

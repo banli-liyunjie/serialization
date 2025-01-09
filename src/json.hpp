@@ -5,6 +5,8 @@
 #include <variant>
 #include <vector>
 
+namespace banli {
+
 enum json_type {
     JSON_WRONG,
     JSON_NULL,
@@ -23,16 +25,16 @@ public:
     json_object() = default;
     ~json_object();
 
-    std::string get_json_string() const;
-    long long get_json_integer() const;
-    double get_json_floating() const;
-    bool get_json_boolean() const;
-    json_object* operator[](size_t index) const;
-    json_object* operator[](const std::string& key) const;
-
-private:
+    inline std::string get_json_string() const;
+    inline long long get_json_integer() const;
+    inline double get_json_floating() const;
+    inline bool get_json_boolean() const;
+    inline json_object* operator[](size_t index) const;
+    inline json_object* operator[](const std::string& key) const;
 };
 
-json_object* json_load(const std::string& file_name);
+inline json_object* json_load(const std::string& file_name);
+inline json_object* json_get(const std::string& json_string);
+}
 
-json_object* json_get(const std::string& json_string);
+#include "details/json.inl"
