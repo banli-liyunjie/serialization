@@ -5,30 +5,27 @@
 
 namespace banli {
 
+json_object::json_object()
+{
+    object_count++;
+}
+
 json_object::~json_object()
 {
-    if (type == json_type::JSON_ARRAY) {
-        for (auto p : std::get<std::vector<json_object*>>(value)) {
-            delete (p);
-        }
-    } else if (type == json_type::JSON_CLASS) {
-        for (auto p : std::get<std::unordered_map<std::string, json_object*>>(value)) {
-            delete (p.second);
-        }
-    }
+    object_count--;
 }
 
 inline std::string json_object::get_json_string() const
 {
-    if (type == json_type::JSON_STRING)
+    if (type == json_type::JSON_STRING && std::holds_alternative<std::string>(value))
         return std::get<std::string>(value);
     else
-        return "";
+        return "this is not a string";
 }
 
 inline long long json_object::get_json_integer() const
 {
-    if (type == json_type::JSON_INTEGER)
+    if (type == json_type::JSON_INTEGER && std::holds_alternative<long long>(value))
         return std::get<long long>(value);
     else
         return 0;
@@ -36,7 +33,7 @@ inline long long json_object::get_json_integer() const
 
 inline double json_object::get_json_floating() const
 {
-    if (type == json_type::JSON_FLOATING)
+    if (type == json_type::JSON_FLOATING && std::holds_alternative<double>(value))
         return std::get<double>(value);
     else
         return 0.0f;
@@ -44,24 +41,24 @@ inline double json_object::get_json_floating() const
 
 inline bool json_object::get_json_boolean() const
 {
-    if (type == json_type::JSON_BOOL)
+    if (type == json_type::JSON_BOOL && std::holds_alternative<bool>(value))
         return std::get<bool>(value);
     else
         return false;
 }
 
-inline json_object* json_object::operator[](size_t index) const
+inline std::shared_ptr<json_object> json_object::operator[](size_t index) const
 {
-    if (type == json_type::JSON_ARRAY && index < std::get<std::vector<json_object*>>(value).size())
-        return std::get<std::vector<json_object*>>(value)[index];
+    if (type == json_type::JSON_ARRAY && std::holds_alternative<std::vector<std::shared_ptr<json_object>>>(value) && index < std::get<std::vector<std::shared_ptr<json_object>>>(value).size())
+        return std::get<std::vector<std::shared_ptr<json_object>>>(value)[index];
     else
         return nullptr;
 }
 
-inline json_object* json_object::operator[](const std::string& key) const
+inline std::shared_ptr<json_object> json_object::operator[](const std::string& key) const
 {
-    if (type == json_type::JSON_CLASS) {
-        auto& u = std::get<std::unordered_map<std::string, json_object*>>(value);
+    if (type == json_type::JSON_CLASS && std::holds_alternative<std::unordered_map<std::string, std::shared_ptr<json_object>>>(value)) {
+        auto& u = std::get<std::unordered_map<std::string, std::shared_ptr<json_object>>>(value);
         if (u.find(key) != u.end())
             return u.at(key);
         else
@@ -70,7 +67,7 @@ inline json_object* json_object::operator[](const std::string& key) const
         return nullptr;
 }
 
-inline size_t analyze_json_string(json_object* jo, const std::string& json_string, size_t pos)
+inline size_t analyze_json_string(std::shared_ptr<json_object> jo, const std::string& json_string, size_t pos)
 {
     std::string non_string = " \n\t\r";
 
@@ -79,7 +76,7 @@ inline size_t analyze_json_string(json_object* jo, const std::string& json_strin
     if (loc != std::string::npos) {
         switch (json_string[loc]) {
         case '{': {
-            jo->value = std::unordered_map<std::string, json_object*>();
+            jo->value = std::unordered_map<std::string, std::shared_ptr<json_object>>();
             size_t times = 0;
             while (({
                 loc = json_string.find_first_not_of(non_string, loc + 1);
@@ -102,7 +99,7 @@ inline size_t analyze_json_string(json_object* jo, const std::string& json_strin
                     goto CLASS_WRONG;
                 }
                 std::string key = json_string.substr(loc + 1, next - loc - 1);
-                auto& u = std::get<std::unordered_map<std::string, json_object*>>(jo->value);
+                auto& u = std::get<std::unordered_map<std::string, std::shared_ptr<json_object>>>(jo->value);
                 if (u.find(key) != u.end()) {
                     std::cerr << "duplicate key : " << "\"" << key << "\"" << std::endl;
                     goto CLASS_WRONG;
@@ -112,10 +109,9 @@ inline size_t analyze_json_string(json_object* jo, const std::string& json_strin
                     std::cerr << "the key " << "(\"" << key << "\")" << " must be followed by the character ':'" << std::endl;
                     goto CLASS_WRONG;
                 }
-                json_object* sub_object = new json_object();
+                std::shared_ptr<json_object> sub_object = std::make_shared<json_object>();
                 loc = analyze_json_string(sub_object, json_string, loc + 1);
                 if (sub_object->type == json_type::JSON_WRONG) {
-                    delete sub_object;
                     std::cerr << "the key " << "(\"" << key << "\")" << " does not have a valid object" << std::endl;
                     goto CLASS_WRONG;
                 }
@@ -136,15 +132,14 @@ inline size_t analyze_json_string(json_object* jo, const std::string& json_strin
             break;
 
         CLASS_WRONG:
-            for (auto p : std::get<std::unordered_map<std::string, json_object*>>(jo->value)) {
-                delete (p.second);
-            }
+            auto& u = std::get<std::unordered_map<std::string, std::shared_ptr<json_object>>>(jo->value);
+            u.clear();
             jo->type = json_type::JSON_WRONG;
             break;
         }
 
         case '[': {
-            jo->value = std::vector<json_object*>();
+            jo->value = std::vector<std::shared_ptr<json_object>>();
             size_t times = 0;
             while (({
                 loc = json_string.find_first_not_of(non_string, loc + 1);
@@ -157,14 +152,13 @@ inline size_t analyze_json_string(json_object* jo, const std::string& json_strin
                         goto ARRAY_WRONG;
                     }
                 }
-                json_object* sub_object = new json_object();
+                std::shared_ptr<json_object> sub_object = std::make_shared<json_object>();
                 loc = analyze_json_string(sub_object, json_string, loc);
                 if (sub_object->type == json_type::JSON_WRONG) {
-                    delete sub_object;
                     std::cerr << "the array does not have a valid object" << std::endl;
                     goto ARRAY_WRONG;
                 }
-                std::get<std::vector<json_object*>>(jo->value).emplace_back(sub_object);
+                std::get<std::vector<std::shared_ptr<json_object>>>(jo->value).emplace_back(sub_object);
                 times++;
             }
             if (loc == std::string::npos || loc == ',') {
@@ -181,17 +175,14 @@ inline size_t analyze_json_string(json_object* jo, const std::string& json_strin
             break;
 
         ARRAY_WRONG:
-            auto& v = std::get<std::vector<json_object*>>(jo->value);
-            for (auto& p : v) {
-                delete p;
-            }
+            auto& v = std::get<std::vector<std::shared_ptr<json_object>>>(jo->value);
             v.clear();
             jo->type = json_type::JSON_WRONG;
             break;
         }
 
         case '"': {
-            jo->value = "";
+            jo->value = std::string();
             size_t next;
             while (({
                 next = json_string.find_first_of('"', loc + 1);
@@ -220,6 +211,7 @@ inline size_t analyze_json_string(json_object* jo, const std::string& json_strin
                     pos = loc + 3;
                     jo->type = json_type::JSON_BOOL;
                 } else {
+                    std::cerr << "invalid json number or boolean" << std::endl;
                     goto WRONG;
                 }
             } else if (json_string[loc] == 'f' && loc + 4 < json_string.size()) {
@@ -233,6 +225,7 @@ inline size_t analyze_json_string(json_object* jo, const std::string& json_strin
                     pos = loc + 4;
                     jo->type = json_type::JSON_BOOL;
                 } else {
+                    std::cerr << "invalid json number or boolean" << std::endl;
                     goto WRONG;
                 }
 
@@ -246,6 +239,7 @@ inline size_t analyze_json_string(json_object* jo, const std::string& json_strin
                     pos = loc + 3;
                     jo->type = json_type::JSON_NULL;
                 } else {
+                    std::cerr << "invalid json number or boolean" << std::endl;
                     goto WRONG;
                 }
             } else {
@@ -311,13 +305,14 @@ inline size_t analyze_json_string(json_object* jo, const std::string& json_strin
         }
         }
     } else {
+        std::cerr << "invalid json string" << std::endl;
         jo->type = json_type::JSON_WRONG;
     }
 
     return pos;
 }
 
-inline json_object* json_load(const std::string& file_name)
+inline std::shared_ptr<json_object> json_load(const std::string& file_name)
 {
     if (!std::filesystem::exists(file_name)) {
         std::cerr << "file does not exist : " << file_name << std::endl;
@@ -337,15 +332,14 @@ inline json_object* json_load(const std::string& file_name)
     return json_get(json_string);
 }
 
-json_object* json_get(const std::string& json_string)
+std::shared_ptr<json_object> json_get(const std::string& json_string)
 {
-    json_object* jo = new json_object();
+    std::shared_ptr<json_object> jo = std::make_shared<json_object>();
 
     analyze_json_string(jo, json_string, 0);
 
     if (jo->type != json_type::JSON_WRONG) //!
         return jo;
-    delete (jo);
     return nullptr;
 }
 

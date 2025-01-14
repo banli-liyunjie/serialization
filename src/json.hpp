@@ -1,4 +1,5 @@
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -20,21 +21,23 @@ enum json_type {
 
 class json_object {
 public:
-    json_type type = json_type::JSON_WRONG;
-    std::variant<std::string, long long, double, bool, std::vector<json_object*>, std::unordered_map<std::string, json_object*>> value;
-    json_object() = default;
+    json_object();
     ~json_object();
 
     inline std::string get_json_string() const;
     inline long long get_json_integer() const;
     inline double get_json_floating() const;
     inline bool get_json_boolean() const;
-    inline json_object* operator[](size_t index) const;
-    inline json_object* operator[](const std::string& key) const;
+    inline std::shared_ptr<json_object> operator[](size_t index) const;
+    inline std::shared_ptr<json_object> operator[](const std::string& key) const;
+
+    json_type type = json_type::JSON_WRONG;
+    std::variant<std::string, long long, double, bool, std::vector<std::shared_ptr<json_object>>, std::unordered_map<std::string, std::shared_ptr<json_object>>> value;
+    inline static int object_count = 0;
 };
 
-inline json_object* json_load(const std::string& file_name);
-inline json_object* json_get(const std::string& json_string);
+inline std::shared_ptr<json_object> json_load(const std::string& file_name);
+inline std::shared_ptr<json_object> json_get(const std::string& json_string);
 }
 
 #include "details/json.inl"

@@ -105,7 +105,9 @@ int main()
 #endif
 
     system(command.c_str());
-    json_object* json_root = json_load(result_json);
+    std::shared_ptr<json_object> json_root = json_load(result_json);
+
+    cout << json_object::object_count << endl;
 
     if (json_root != nullptr) {
         cout << "json_type : " << json_root->type << endl;
@@ -145,7 +147,9 @@ int main()
         set_field(a0, b, "b"); // operator=
         cout << serialize(a0) << endl;
 
-        delete json_root;
+        cout << json_object::object_count << endl;
+        json_root.reset();
+        cout << json_object::object_count << endl;
     }
     return 0;
 }

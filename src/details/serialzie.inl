@@ -2,7 +2,7 @@
 
 namespace banli {
 
-inline std::string to_serialize::operator()(const json_object* jo)
+inline std::string to_serialize::operator()(const std::shared_ptr<json_object>& jo)
 {
     std::ostringstream oss;
     if (jo->type == json_type::JSON_WRONG) {
@@ -23,7 +23,7 @@ inline std::string to_serialize::operator()(const json_object* jo)
         break;
     case json_type::JSON_ARRAY: {
         oss << "[";
-        auto& v = std::get<std::vector<json_object*>>(jo->value);
+        auto& v = std::get<std::vector<std::shared_ptr<json_object>>>(jo->value);
         for (int i = 0; i < v.size(); ++i) {
             oss << (*this)(v[i]);
             if (i < v.size() - 1)
@@ -34,7 +34,7 @@ inline std::string to_serialize::operator()(const json_object* jo)
     }
     case json_type::JSON_CLASS: {
         oss << "{";
-        auto& u = std::get<std::unordered_map<std::string, json_object*>>(jo->value);
+        auto& u = std::get<std::unordered_map<std::string, std::shared_ptr<json_object>>>(jo->value);
         for (auto it = u.begin(); it != u.end(); ++it) {
             oss << "\"" << it->first << "\" : ";
             oss << (*this)(it->second);
@@ -107,7 +107,7 @@ inline int to_serialize::updata_class_json::operator()(field_left<_T>& p)
     return 0;
 }
 
-inline int to_deserialize::operator()(bool& b, const json_object* jo)
+inline int to_deserialize::operator()(bool& b, const std::shared_ptr<json_object>& jo)
 {
     if (jo == nullptr || jo->type != json_type::JSON_BOOL) {
         std::cerr << "please check json_object" << std::endl;
@@ -117,7 +117,7 @@ inline int to_deserialize::operator()(bool& b, const json_object* jo)
     return 0;
 }
 
-inline int to_deserialize::operator()(std::string& s, const json_object* jo)
+inline int to_deserialize::operator()(std::string& s, const std::shared_ptr<json_object>& jo)
 {
     if (jo == nullptr || jo->type != json_type::JSON_STRING) {
         std::cerr << "please check json_object" << std::endl;
@@ -131,10 +131,9 @@ template <typename _T>
 inline int to_deserialize::operator()(_T& t, const std::string& js)
 {
     int ret = 0;
-    json_object* jo = json_get(js);
+    std::shared_ptr<json_object> jo = json_get(js);
     if (jo != nullptr) {
         ret |= (*this)(t, jo);
-        delete jo;
     } else {
         ret = -1;
     }
@@ -142,7 +141,7 @@ inline int to_deserialize::operator()(_T& t, const std::string& js)
 }
 
 template <typename _T>
-inline typename std::enable_if<std::is_arithmetic<_T>::value, int>::type to_deserialize::operator()(_T& t, const json_object* jo)
+inline typename std::enable_if<std::is_arithmetic<_T>::value, int>::type to_deserialize::operator()(_T& t, const std::shared_ptr<json_object>& jo)
 {
     if (jo == nullptr) {
         std::cerr << "please check json_object" << std::endl;
@@ -160,13 +159,13 @@ inline typename std::enable_if<std::is_arithmetic<_T>::value, int>::type to_dese
 }
 
 template <typename _T>
-inline int to_deserialize::operator()(std::vector<_T>& vec, const json_object* jo)
+inline int to_deserialize::operator()(std::vector<_T>& vec, const std::shared_ptr<json_object>& jo)
 {
     if (jo == nullptr || jo->type != json_type::JSON_ARRAY) {
         std::cerr << "please check json_object" << std::endl;
         return -1;
     }
-    auto& sub_jo = std::get<std::vector<json_object*>>(jo->value);
+    auto& sub_jo = std::get<std::vector<std::shared_ptr<json_object>>>(jo->value);
     if (vec.size() > sub_jo.size())
         vec.resize(sub_jo.size());
     else if (vec.size() < sub_jo.size()) {
@@ -184,7 +183,7 @@ inline int to_deserialize::operator()(std::vector<_T>& vec, const json_object* j
 }
 
 template <typename _T>
-inline typename std::enable_if<has_data_update<_T>::value, int>::type to_deserialize::operator()(_T& obj, const json_object* jo)
+inline typename std::enable_if<has_data_update<_T>::value, int>::type to_deserialize::operator()(_T& obj, const std::shared_ptr<json_object>& jo)
 {
     if (jo == nullptr || jo->type != json_type::JSON_CLASS) {
         std::cerr << "please check json_object" << std::endl;
@@ -194,7 +193,7 @@ inline typename std::enable_if<has_data_update<_T>::value, int>::type to_deseria
     return obj.data_update("", ucf);
 }
 
-to_deserialize::update_class_field::update_class_field(const json_object* _jo, to_deserialize& p)
+to_deserialize::update_class_field::update_class_field(const std::shared_ptr<json_object>& _jo, to_deserialize& p)
     : jo(_jo)
     , parent(p)
 {
