@@ -1,5 +1,4 @@
 #pragma once
-
 namespace banli {
 
 basic_object::basic_object()
@@ -10,7 +9,7 @@ basic_object::basic_object()
 
 basic_object::basic_object(const basic_object& other)
     : type(other.type)
-    , ptr_wrapper(other.ptr_wrapper ? other.ptr_wrapper->clone() : nullptr)
+    , ptr_wrapper(other.ptr_wrapper->clone())
 {
 }
 
@@ -18,6 +17,7 @@ basic_object::basic_object(basic_object&& other)
     : type(other.type)
     , ptr_wrapper(std::move(other.ptr_wrapper))
 {
+    other.ptr_wrapper = nullptr;
 }
 
 template <typename _T>
@@ -31,6 +31,13 @@ template <typename Class, typename _T>
 basic_object::basic_object(Class& value, _T Class::*ptr)
     : type(typeid(_T))
     , ptr_wrapper(std::make_unique<type_pointer_wrapper_impl<_T>>(&(value.*ptr)))
+{
+}
+
+template <typename Class, typename _T>
+basic_object::basic_object(const Class& value, _T Class::*ptr)
+    : type(typeid(_T))
+    , ptr_wrapper(std::make_unique<type_pointer_wrapper_impl<_T>>(const_cast<_T*>(&(value.*ptr))))
 {
 }
 
@@ -126,13 +133,38 @@ inline basic_object basic_object::operator[](const std::string& field_name)
     return get_class_element(field_name);
 }
 
+template <typename... Args>
+inline basic_object basic_object::invoke_method(const std::string& method_name, Args&&... args)
+{
+    std::vector<basic_object> arg_list;
+    arg_list.reserve(sizeof...(args));
+    (arg_list.emplace_back(std::forward<Args>(args)), ...);
+    return get_type_manager().invoke_method_impl(*this, method_name, arg_list);
+}
+
 template <typename _T>
-inline _T& basic_object::data_as()
+inline const _T& basic_object::data_as() const
 {
     if (is_valid()) {
-        return *(_T*)ptr_wrapper->get();
+        return *(const _T*)ptr_wrapper->get();
     }
     throw std::runtime_error("Invalid object");
+}
+template <typename _T>
+inline const _T& basic_object::data_as()
+{
+    if (is_valid()) {
+        return *(const _T*)ptr_wrapper->get();
+    }
+    throw std::runtime_error("Invalid object");
+}
+
+inline void* basic_object::as_pointer() const
+{
+    if (is_valid()) {
+        return ptr_wrapper->get();
+    }
+    return nullptr;
 }
 
 template <typename _T>
@@ -172,15 +204,49 @@ inline typename std::enable_if<std::is_class<_T>::value, void>::type type_manage
 inline basic_object type_manager::get_field(basic_object& class_obj, const std::string& field_name)
 {
     std::type_index type = class_obj.get_type();
-    if (field_map.find(type) == field_map.end()) {
+    if (field_map.find(type) == field_map.end() || field_map[type].find(field_name) == field_map[type].end()) {
         return basic_object();
         // throw std::runtime_error("Class not found");
-    }
-    if (field_map[type].find(field_name) == field_map[type].end()) {
-        return basic_object();
-        // throw std::runtime_error("Field not found");
+        //  throw std::runtime_error("field not found");
     }
     return field_map[type][field_name]->generate(class_obj);
+}
+
+template <typename Class, typename Ret, typename... Args>
+inline typename std::enable_if<std::is_class<Class>::value, void>::type type_manager::register_method(const std::string& method_name, Ret (Class::*method)(Args...))
+{
+    std::type_index type = typeid(Class);
+    auto& method_entries = method_map[type];
+    if (method_entries.find(method_name) != method_entries.end()) {
+        return;
+    }
+    method_entries.emplace(
+        method_name,
+        std::make_unique<class_method_wrapper_impl<Class, Ret, Args...>>(method));
+}
+
+inline basic_object type_manager::invoke_method(basic_object& class_obj, const std::string& method_name)
+{
+    std::vector<basic_object> empty_args;
+    return invoke_method(class_obj, method_name, empty_args);
+}
+
+template <typename... Args>
+inline basic_object type_manager::invoke_method(basic_object& class_obj, const std::string& method_name, Args&&... args)
+{
+    std::vector<basic_object> arg_list;
+    arg_list.reserve(sizeof...(args));
+    (arg_list.emplace_back(std::forward<Args>(args)), ...);
+    return invoke_method_impl(class_obj, method_name, arg_list);
+}
+
+inline basic_object type_manager::invoke_method_impl(basic_object& class_obj, const std::string& method_name, const std::vector<basic_object>& args)
+{
+    std::type_index type = class_obj.get_type();
+    if (method_map.find(type) == method_map.end() || method_map[type].find(method_name) == method_map[type].end()) {
+        return basic_object();
+    }
+    return method_map[type][method_name]->invoke(class_obj, args);
 }
 
 inline interface::type_manager_interface& get_type_manager()

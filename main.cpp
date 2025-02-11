@@ -29,6 +29,30 @@ public:
     bool f = false;
     string aaa = "aaa";
     BBB b;
+
+    void print()
+    {
+        cout << "AAA::print" << endl;
+    }
+    int add(int a, int b)
+    {
+        return a + b;
+    }
+
+    float mul(float a, float b)
+    {
+        return a * b;
+    }
+
+    void fix_int_by_pointer(int* b, int m)
+    {
+        *b = m;
+    }
+
+    void fix_int_by_left(int& b, int m)
+    {
+        b = m;
+    }
 };
 
 fs::path get_executable_directory()
@@ -81,6 +105,8 @@ void example()
 
     try {
         cout << "A0::x " << obj_A0["x"].data_as<int>() << endl;
+        // cout << "A0::x " << obj_A0["x"].data_as<string>() << endl;
+        // cout << "A0::x " << obj_A0["sdsa"].data_as<string>() << endl;
         cout << "A0::y " << obj_A0["y"].data_as<float>() << endl;
         cout << "A0::f " << obj_A0["f"].data_as<bool>() << endl;
         cout << "A0::aaa " << obj_A0["aaa"].data_as<string>() << endl;
@@ -138,7 +164,15 @@ int main()
     Type_Manager.register_field("aaa", &AAA::aaa);
     Type_Manager.register_field("b", &AAA::b);
 
+    Type_Manager.register_method("print", &AAA::print);
+    Type_Manager.register_method("add", &AAA::add);
+    Type_Manager.register_method("mul", &AAA::mul);
+    Type_Manager.register_method("fix_int_by_pointer", &AAA::fix_int_by_pointer);
+    // Type_Manager.register_method("fix_int_by_left", &AAA::fix_int_by_left); // parameter is not allowed, please use pointer
+
     example();
+
+    cout << "**************************************************" << endl;
 
     fs::path directory_path;
     try {
@@ -181,6 +215,23 @@ int main()
         deserialize(a0, serialize(a1));
         cout << serialize(a0) << endl;
     }
+    cout << "**************************************************" << endl;
+    a0.invoke_method("print");
+    basic_object a3 = a0.invoke_method("add", 1, 2);
+    cout << serialize(a3) << endl;
+    basic_object a4 = a0.invoke_method("mul", 2.5f, 2.5f);
+    cout << serialize(a4) << endl;
+    basic_object a5 = a0.invoke_method("mul", 2.5, 2.5); // you must explicitly specify the type
+    cout << serialize(a5) << endl;
+
+    cout << "**************************************************" << endl;
+    int x = 0;
+    a0.invoke_method("fix_int_by_pointer", &x, -100);
+    cout << "x = " << x << endl;
+
+    Type_Manager.invoke_method(a0, "fix_int_by_pointer", &x, -200);
+    cout << "x = " << x << endl;
+
     return 0;
 }
 

@@ -33,6 +33,7 @@ namespace interface {
         virtual ~type_manager_interface() = default;
         virtual basic_object make_instance(const std::string& class_name) = 0;
         virtual basic_object get_field(basic_object& class_obj, const std::string& field_name) = 0;
+        virtual basic_object invoke_method_impl(basic_object& class_obj, const std::string& method_name, const std::vector<basic_object>& args) = 0;
     };
 
     class type_pointer_wrapper {
@@ -62,6 +63,11 @@ namespace interface {
         virtual basic_object generate() = 0;
     };
 
+    class class_method_wrapper {
+    public:
+        virtual ~class_method_wrapper() = default;
+        virtual basic_object invoke(basic_object& obj, const std::vector<basic_object>& args) = 0;
+    };
 }
 
 interface::type_manager_interface& get_type_manager();
@@ -81,6 +87,8 @@ public:
     basic_object(const _T& value);
     template <typename Class, typename _T>
     basic_object(Class& value, _T Class::*ptr);
+    template <typename Class, typename _T>
+    basic_object(const Class& value, _T Class::*ptr);
     template <typename _T>
     basic_object(_T* ptr, bool should_delete = false);
     ~basic_object() = default;
@@ -101,8 +109,14 @@ public:
     inline basic_object get_class_element(const std::string& field_name);
     inline basic_object operator[](const std::string& field_name);
 
+    template <typename... Args>
+    basic_object invoke_method(const std::string& method_name, Args&&... args);
+
     template <typename _T>
-    inline _T& data_as();
+    inline const _T& data_as() const;
+    template <typename _T>
+    inline const _T& data_as();
+    void* as_pointer() const;
 
 protected:
     std::type_index type;
@@ -138,6 +152,53 @@ public:
     }
 };
 
+template <typename Class, typename Ret, typename... Args>
+class class_method_wrapper_impl : public interface::class_method_wrapper {
+public:
+    using MethodPtr = Ret (Class::*)(Args...);
+
+    class_method_wrapper_impl(MethodPtr method)
+        : method_ptr(method)
+    {
+    }
+
+    basic_object invoke(basic_object& obj, const std::vector<basic_object>& args) override
+    {
+        if (sizeof...(Args) != args.size()) {
+            throw std::runtime_error("nums of args not match");
+        }
+        return invoke_impl(obj, args, std::make_index_sequence<sizeof...(Args)> {});
+    }
+
+private:
+    template <size_t... I>
+    basic_object invoke_impl(basic_object& obj, const std::vector<basic_object>& args,
+        std::index_sequence<I...>)
+    {
+        auto& class_obj = const_cast<Class&>(obj.template data_as<Class>());
+        if constexpr (std::is_void_v<Ret>) {
+            (class_obj.*method_ptr)(get_arg<Args>(args[I])...);
+            return basic_object();
+        } else {
+            return basic_object((class_obj.*method_ptr)(
+                get_arg<Args>(args[I])...));
+        }
+    }
+
+    template <typename T>
+    static auto get_arg(const basic_object& arg)
+    {
+        if constexpr (std::is_pointer_v<T>) {
+            using pointed_type = std::remove_pointer_t<T>;
+            return static_cast<pointed_type*>(const_cast<void*>(arg.as_pointer()));
+        } else {
+            return arg.template data_as<std::decay_t<T>>();
+        }
+    }
+
+    MethodPtr method_ptr;
+};
+
 class type_manager : public interface::type_manager_interface {
 public:
     template <typename _T, typename enable>
@@ -148,11 +209,19 @@ public:
     template <typename _T, typename _U>
     inline typename std::enable_if<std::is_class<_T>::value, void>::type register_field(const std::string& field_name, _U _T::*field_ptr);
     inline basic_object get_field(basic_object& class_obj, const std::string& field_name) override;
+    template <typename Class, typename Ret, typename... Args>
+    inline typename std::enable_if<std::is_class<Class>::value, void>::type register_method(const std::string& method_name, Ret (Class::*method)(Args...));
+
+    basic_object invoke_method(basic_object& class_obj, const std::string& method_name);
+    template <typename... Args>
+    basic_object invoke_method(basic_object& class_obj, const std::string& method_name, Args&&... args);
+    inline basic_object invoke_method_impl(basic_object& class_obj, const std::string& method_name, const std::vector<basic_object>& args) override;
 
 private:
     inline static std::unordered_map<std::string, std::type_index> type_map;
     inline static std::unordered_map<std::type_index, std::unique_ptr<interface::basic_object_generator>> class_map;
     inline static std::unordered_map<std::type_index, std::unordered_map<std::string, std::unique_ptr<interface::class_field_generator>>> field_map;
+    inline static std::unordered_map<std::type_index, std::unordered_map<std::string, std::unique_ptr<interface::class_method_wrapper>>> method_map;
 };
 
 inline static type_manager Type_Manager;
